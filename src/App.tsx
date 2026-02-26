@@ -12,20 +12,21 @@ import ReportMalpractice from "./pages/invigilator/ReportMalpractice";
 import AdminDashboard from "./pages/admin/Dashboard";
 import StudentDashboard from "./pages/student/Dashboard";
 import NotFound from "./pages/NotFound";
+import Signup from "./pages/Signup";
 
 const queryClient = new QueryClient();
 
 // Protected Route Component
-const ProtectedRoute: React.FC<{ 
-  children: React.ReactNode; 
+const ProtectedRoute: React.FC<{
+  children: React.ReactNode;
   allowedRoles?: string[];
 }> = ({ children, allowedRoles }) => {
   const { isAuthenticated, user } = useAuth();
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/" replace />;
   }
-  
+
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     // Redirect to appropriate dashboard
     switch (user.role) {
@@ -39,14 +40,14 @@ const ProtectedRoute: React.FC<{
         return <Navigate to="/" replace />;
     }
   }
-  
+
   return <>{children}</>;
 };
 
 // Redirect authenticated users from login
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, user } = useAuth();
-  
+
   if (isAuthenticated && user) {
     switch (user.role) {
       case 'invigilator':
@@ -57,7 +58,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         return <Navigate to="/student/dashboard" replace />;
     }
   }
-  
+
   return <>{children}</>;
 };
 
@@ -70,7 +71,7 @@ const AppRoutes = () => {
           <Login />
         </PublicRoute>
       } />
-      
+
       {/* Invigilator Routes */}
       <Route path="/invigilator/dashboard" element={
         <ProtectedRoute allowedRoles={['invigilator']}>
@@ -102,7 +103,7 @@ const AppRoutes = () => {
           <InvigilatorDashboard />
         </ProtectedRoute>
       } />
-      
+
       {/* Admin Routes */}
       <Route path="/admin/dashboard" element={
         <ProtectedRoute allowedRoles={['admin']}>
@@ -139,7 +140,7 @@ const AppRoutes = () => {
           <AdminDashboard />
         </ProtectedRoute>
       } />
-      
+
       {/* Student Routes */}
       <Route path="/student/dashboard" element={
         <ProtectedRoute allowedRoles={['student']}>
@@ -166,9 +167,10 @@ const AppRoutes = () => {
           <StudentDashboard />
         </ProtectedRoute>
       } />
-      
+
       {/* Catch-all */}
       <Route path="*" element={<NotFound />} />
+      <Route path="/signup" element={<Signup />} />
     </Routes>
   );
 };

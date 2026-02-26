@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 import {
   AlertTriangle,
   Clock,
   MapPin,
   Users,
   FileText,
-  Eye,
-  ArrowUpRight,
   ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
-// Mock data
+// Mock data for Exam (Static for now)
 const currentExam = {
   name: 'CS101 - Database Management Systems',
   time: { start: '10:00 AM', end: '1:00 PM' },
@@ -24,58 +23,62 @@ const currentExam = {
   students: { present: 87, total: 90 },
 };
 
-const quickStats = [
-  { label: 'Total Reports Today', value: 5, icon: FileText, trend: '+2 from yesterday' },
-  { label: 'Pending Reviews', value: 2, icon: Clock, trend: 'Awaiting action' },
-  { label: 'Active Exams', value: 1, icon: ClipboardCheck, trend: 'In progress' },
-  { label: 'My Total Reports', value: 23, icon: AlertTriangle, trend: 'This semester' },
-];
-
-const recentReports = [
-  {
-    id: 'CASE-2024-001',
-    studentName: 'Amit Kumar',
-    time: '10:45 AM',
-    severity: 'major' as const,
-    status: 'pending' as const,
-  },
-  {
-    id: 'CASE-2024-002',
-    studentName: 'Priya Sharma',
-    time: '11:20 AM',
-    severity: 'minor' as const,
-    status: 'review' as const,
-  },
-  {
-    id: 'CASE-2024-003',
-    studentName: 'Rahul Verma',
-    time: '12:05 PM',
-    severity: 'severe' as const,
-    status: 'pending' as const,
-  },
-];
-
 const InvigilatorDashboard: React.FC = () => {
+  // 1. Timer State
   const [countdown, setCountdown] = useState({ hours: 2, minutes: 30, seconds: 0 });
 
+  // 2. Backend Data State
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalReports: 0,
+    pendingReports: 0,
+    activeExams: 0,
+    myReports: 0
+  });
+  const [recentReports, setRecentReports] = useState<any[]>([]);
+
+  // 3. Fetch Data from Backend
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/reports/dashboard');
+        
+        if (response.data.success) {
+          setStats(response.data.stats);
+          setRecentReports(response.data.recentReports);
+        }
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // 4. Countdown Logic
   useEffect(() => {
     const timer = setInterval(() => {
       setCountdown((prev) => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        }
+        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
+        else if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
+        else if (prev.hours > 0) return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
         return prev;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
   const formatTime = (value: number) => value.toString().padStart(2, '0');
+
+  // 5. Dynamic Stats Array
+  const quickStats = [
+    { label: 'Total Reports Today', value: stats.totalReports, icon: FileText, trend: 'Updated just now' },
+    { label: 'Pending Reviews', value: stats.pendingReports, icon: Clock, trend: 'Awaiting action' },
+    { label: 'Active Exams', value: stats.activeExams, icon: ClipboardCheck, trend: 'In progress' },
+    { label: 'My Total Reports', value: stats.myReports, icon: AlertTriangle, trend: 'This semester' },
+  ];
 
   return (
     <DashboardLayout title="Invigilator Dashboard">
@@ -134,7 +137,7 @@ const InvigilatorDashboard: React.FC = () => {
               <Progress value={(currentExam.students.present / currentExam.students.total) * 100} className="h-2" />
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - UPDATED: REMOVED Attendance & View Reports */}
             <div className="flex flex-wrap gap-3 pt-2">
               <Link to="/invigilator/report">
                 <Button size="lg" className="bg-destructive hover:bg-destructive/90 text-destructive-foreground animate-pulse-ring shadow-glow-accent gap-2">
@@ -142,14 +145,6 @@ const InvigilatorDashboard: React.FC = () => {
                   🚨 Report Malpractice
                 </Button>
               </Link>
-              <Button variant="outline" className="gap-2">
-                <Eye className="w-4 h-4" />
-                View Active Reports
-              </Button>
-              <Button variant="outline" className="gap-2">
-                <ClipboardCheck className="w-4 h-4" />
-                Mark Attendance
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -162,7 +157,9 @@ const InvigilatorDashboard: React.FC = () => {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">{stat.label}</p>
-                    <p className="text-3xl font-bold text-foreground">{stat.value}</p>
+                    <p className="text-3xl font-bold text-foreground">
+                       {loading ? "..." : stat.value}
+                    </p>
                     <p className="text-xs text-muted-foreground">{stat.trend}</p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-primary/10">
@@ -178,44 +175,41 @@ const InvigilatorDashboard: React.FC = () => {
         <Card className="border-0 shadow-glass">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg font-semibold">Recent Reports</CardTitle>
-            <Link to="/invigilator/reports">
-              <Button variant="ghost" size="sm" className="gap-1 text-primary">
-                View All
-                <ArrowUpRight className="w-4 h-4" />
-              </Button>
-            </Link>
           </CardHeader>
           <CardContent>
-            <div className="divide-y divide-border">
-              {recentReports.map((report) => (
-                <div key={report.id} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-2.5 h-2.5 rounded-full ${
-                      report.severity === 'minor' ? 'bg-severity-minor' :
-                      report.severity === 'major' ? 'bg-severity-major' :
-                      'bg-severity-severe'
-                    }`} />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">{report.id}</span>
-                        <Badge variant={report.severity} className="text-xs">
-                          {report.severity.charAt(0).toUpperCase() + report.severity.slice(1)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{report.studentName} • {report.time}</p>
+            {loading ? (
+                <div className="text-center py-4 text-muted-foreground">Loading reports...</div>
+            ) : recentReports.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">No reports found.</div>
+            ) : (
+                <div className="divide-y divide-border">
+                {recentReports.map((report) => (
+                    <div key={report.id} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-2.5 h-2.5 rounded-full ${
+                        report.severity === 'minor' ? 'bg-yellow-500' :
+                        report.severity === 'major' ? 'bg-orange-500' :
+                        'bg-red-600'
+                        }`} />
+                        <div>
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground">{report.id}</span>
+                            <Badge variant="outline" className="text-xs">
+                            {report.severity.toUpperCase()}
+                            </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{report.studentName} • {report.time}</p>
+                        </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={report.status}>
-                      {report.status === 'pending' ? 'Pending Review' : 'Under Review'}
-                    </Badge>
-                    <Button variant="ghost" size="sm">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </div>
+                    <div className="flex items-center gap-3">
+                        <Badge variant={report.status === 'pending' ? 'destructive' : 'secondary'}>
+                        {report.status === 'pending' ? 'Pending Review' : 'Under Review'}
+                        </Badge>
+                    </div>
+                    </div>
+                ))}
                 </div>
-              ))}
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

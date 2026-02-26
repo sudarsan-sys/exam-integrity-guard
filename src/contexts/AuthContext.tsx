@@ -1,88 +1,63 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
-export type UserRole = 'invigilator' | 'admin' | 'student';
+const AuthContext = createContext(null);
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  avatar?: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string, role: UserRole) => Promise<boolean>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Demo users for testing
-const demoUsers: Record<string, { password: string; user: User }> = {
-  'inv@university.edu': {
-    password: 'demo123',
-    user: {
-      id: '1',
-      email: 'inv@university.edu',
-      name: 'Dr. Sharma',
-      role: 'invigilator',
-    },
-  },
-  'admin@university.edu': {
-    password: 'demo123',
-    user: {
-      id: '2',
-      email: 'admin@university.edu',
-      name: 'Prof. Kumar',
-      role: 'admin',
-    },
-  },
-  'student@university.edu': {
-    password: 'demo123',
-    user: {
-      id: '3',
-      email: 'student@university.edu',
-      name: 'Rahul Verma',
-      role: 'student',
-    },
-  },
-};
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('auth_user');
-    return stored ? JSON.parse(stored) : null;
+export const AuthProvider = ({ children }) => {
+  // Initialize user from localStorage to persist login state across refreshes
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('user');
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error("Error parsing user from localStorage:", e);
+      return null;
+    }
   });
 
-  const login = useCallback(async (email: string, password: string, role: UserRole): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const demoUser = demoUsers[email.toLowerCase()];
-    
-    if (demoUser && demoUser.password === password && demoUser.user.role === role) {
-      setUser(demoUser.user);
-      localStorage.setItem('auth_user', JSON.stringify(demoUser.user));
-      return true;
-    }
-    
-    return false;
-  }, []);
+  // Login Function: Connects to Backend API
+  const login = async (identifier, password, role) => {
+    try {
+      // API Call to your Node.js Backend
+      const response = await axios.post('http://localhost:5000/api/auth/login', {
+        identifier, // This can be email (Invigilator) or RegNo (Student)
+        password,   // Sent for future implementation, currently checked loosely by backend
+        role
+      });
 
-  const logout = useCallback(() => {
+      if (response.data.success) {
+        const userData = response.data.user;
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return true;
+      } else {
+        console.error("Login failed:", response.data.message);
+        return false;
+      }
+    } catch (error) {
+      // Handle network errors or server-side errors (401, 500)
+      console.error("Login Error:", error.response?.data?.message || error.message);
+      return false;
+    }
+  };
+
+  // Logout Function: Clears state and storage
+  const logout = () => {
     setUser(null);
-    localStorage.removeItem('auth_user');
-  }, []);
+    localStorage.removeItem('user');
+  };
+
+  // Check authentication status
+  const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
+// Custom hook to use the AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
